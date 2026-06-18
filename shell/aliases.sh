@@ -127,7 +127,7 @@ remote() {
     echo "Setting up remote environment..."
     ssh "${ssh_opts[@]}" "$user_host" '
         if [ ! -d ~/dotfiles ]; then
-            git clone https://github.com/wusche1/dotfiles.git ~/dotfiles
+            git clone https://github.com/brzepkowski/dotfiles.git ~/dotfiles
         else
             cd ~/dotfiles && git pull
         fi

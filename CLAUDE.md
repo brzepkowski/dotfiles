@@ -21,4 +21,4 @@ Inspired by [vossenwout/pookie-dotfiles](https://github.com/vossenwout/pookie-do
 - **`setup-remote.sh`**: Installs zsh, tmux, neovim, uv, direnv, node, claude-code, age on remote Linux machines (assumes apt)
 - **Secrets**: Age-encrypted, decrypted by `install.sh`. Key lives at `~/.ssh/id_ed25519`
 - **Nested tmux**: F12 toggles local tmux off/on for SSH into remote tmux sessions (same `C-Space` prefix on both)
-- **GitHub repo**: `wusche1/dotfiles`
+- **GitHub repo**: `brzepkowski/dotfiles`
