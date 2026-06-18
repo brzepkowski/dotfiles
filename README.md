@@ -4,11 +4,21 @@ Personal dotfiles managed with symlinks.
 
 ## Installation
 
+### Prerequisite
+
+```bash
+sudo apt install wl-clipboard
+```
+
+### Cloning and installing everything
+
 ```bash
 git clone <repo-url> ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```
+
+At the end if you forked the repo and want to make some changes remember to **change the repo to which you will be writing**.
 
 ## Structure
 
