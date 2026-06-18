@@ -29,6 +29,9 @@ echo "Installing dotfiles..."
 link "$DOTFILES_DIR/zsh/.zshenv" "$HOME/.zshenv"
 link "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
 
+# bash (hooks into ~/.bashrc's existing `. ~/.bash_aliases` line)
+link "$DOTFILES_DIR/bash/.bash_aliases" "$HOME/.bash_aliases"
+
 # git
 link "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 

@@ -1,0 +1,165 @@
+# Sourced by interactive bash and zsh shells
+
+# Git
+alias gs="git status"
+alias ga="git add ."
+alias gc="git commit -m"
+alias gp="git push"
+alias gpl="git pull"
+alias gd="git diff"
+alias gl="git log --oneline --graph"
+
+# Claude Code
+alias cc="claude"
+alias ccdsp="claude --allowedTools 'Bash,Glob,Grep,Read,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task,TaskOutput,TaskStop,TodoWrite,AskUserQuestion,EnterPlanMode,ExitPlanMode,Skill'"
+
+# Tmux
+alias tmux="TERM=xterm-256color tmux"
+
+# Navigation
+alias ..="cd .."
+alias ...="cd ../.."
+alias ll="ls -lah"
+
+# Symlink dotfiles into current project for easy editing
+symhere() {
+    ln -sf ~/dotfiles/claude .claude
+    ln -sf ~/.secrets .secrets
+    echo "Linked .claude and .secrets"
+}
+
+# Open VS Code to remote server with interactive folder selection
+# Usage: remote user@host [-p port] [-i identity_file]
+remote() {
+    [ -n "$ZSH_VERSION" ] && emulate -L bash
+
+    local user_host=""
+    local port="22"
+    local identity="$HOME/.ssh/id_ed25519"
+
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -p) port="$2"; shift 2 ;;
+            -i) identity="$2"; shift 2 ;;
+            ssh) shift ;;  # skip 'ssh' if included
+            *@*) user_host="$1"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    if [ -z "$user_host" ]; then
+        echo "Usage: remote user@host [-p port] [-i identity_file]"
+        return 1
+    fi
+
+    local ssh_opts=(-p "$port" -i "$identity" -o ServerAliveInterval=60 -o ServerAliveCountMax=3)
+
+    echo "Connecting to $user_host:$port..."
+
+    # Get folders in /workspace/
+    local folder_list
+    folder_list=$(ssh "${ssh_opts[@]}" "$user_host" "ls -d /workspace/*/ 2>/dev/null | xargs -n1 basename")
+    local -a folders=()
+    if [ -n "$folder_list" ]; then
+        while IFS= read -r line; do
+            folders+=("$line")
+        done <<< "$folder_list"
+    fi
+
+    local final_path
+    if [ -z "$folder_list" ]; then
+        final_path="/workspace"
+    else
+        local chosen_folder=""
+        if [ "${#folders[@]}" -eq 1 ]; then
+            chosen_folder="${folders[0]}"
+            echo "Found: $chosen_folder"
+        else
+            echo "Select folder:"
+            local i=1
+            for f in "${folders[@]}"; do
+                echo "  $i) $f"
+                i=$((i + 1))
+            done
+            read -p "Enter number: " choice
+            chosen_folder="${folders[$((choice - 1))]}"
+        fi
+
+        final_path="/workspace/$chosen_folder"
+
+        # Check if it's a worktree folder (contains "worktree" in name)
+        if [[ "$chosen_folder" == *worktree* ]]; then
+            local branch_list
+            branch_list=$(ssh "${ssh_opts[@]}" "$user_host" "ls -d /workspace/$chosen_folder/*/ 2>/dev/null | xargs -n1 basename")
+            local -a branches=()
+            if [ -n "$branch_list" ]; then
+                while IFS= read -r line; do
+                    branches+=("$line")
+                done <<< "$branch_list"
+            fi
+
+            if [ -z "$branch_list" ]; then
+                echo "No branches found in $chosen_folder"
+                return 1
+            elif [ "${#branches[@]}" -eq 1 ]; then
+                final_path="/workspace/$chosen_folder/${branches[0]}"
+                echo "Found branch: ${branches[0]}"
+            else
+                echo "Select branch:"
+                local j=1
+                for b in "${branches[@]}"; do
+                    echo "  $j) $b"
+                    j=$((j + 1))
+                done
+                read -p "Enter number: " choice
+                final_path="/workspace/$chosen_folder/${branches[$((choice - 1))]}"
+            fi
+        fi
+    fi
+
+    # Copy SSH key for decrypting secrets (needed for dotfiles setup)
+    ssh "${ssh_opts[@]}" "$user_host" "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+    scp -P "$port" -i "$identity" "$identity" "$user_host:~/.ssh/id_ed25519"
+    ssh "${ssh_opts[@]}" "$user_host" "chmod 600 ~/.ssh/id_ed25519"
+
+    # Setup dotfiles and run setup script on remote
+    echo "Setting up remote environment..."
+    ssh "${ssh_opts[@]}" "$user_host" '
+        if [ ! -d ~/dotfiles ]; then
+            git clone https://github.com/wusche1/dotfiles.git ~/dotfiles
+        else
+            cd ~/dotfiles && git pull
+        fi
+        ~/dotfiles/scripts/setup-remote.sh
+        cd ~/dotfiles && ./install.sh
+    '
+
+    # SSH into remote and start/attach tmux session
+    local session_name
+    session_name=$(basename "$final_path" | tr '.' '_' | tr '-' '_')
+    echo "Connecting to $final_path (tmux session: $session_name)..."
+    ssh "${ssh_opts[@]}" "$user_host" -t "cd $final_path && (tmux attach -t $session_name 2>/dev/null || tmux new -s $session_name)"
+}
+
+# Run python script with nohup, auto-naming output from config
+run() {
+    local config="$1"
+    local name=$(basename "$config" .yaml)
+    nohup uv run python main.py -c "$config" > "${name}.out" 2>&1 &
+    echo "Started PID $! → ${name}.out"
+}
+
+# Auto-activate .venv: check cwd first, then walk up to find one
+activate_venv() {
+    [[ -n "$VIRTUAL_ENV" ]] && return
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -f "$dir/.venv/bin/activate" ]]; then
+            source "$dir/.venv/bin/activate"
+            return
+        fi
+        dir="$(dirname "$dir")"
+    done
+}
+activate_venv
